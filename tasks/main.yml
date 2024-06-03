@@ -1,0 +1,118 @@
+---
+# tasks file for ubuntu-kiosk
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Install packages
+  ansible.builtin.package:
+    name:
+      - chromium-browser
+      - sed
+      - unclutter
+      - dbus-x11
+    state: present
+
+- name: Remove packages
+  ansible.builtin.package:
+    name:
+      - gnome-initial-setup
+      - gnome-shell-extension-ubuntu-dock
+    state: absent
+
+- name: Add 'kiosk' user
+  ansible.builtin.user:
+    name: kiosk
+    state: present
+
+- name: Disable Wayland
+  community.general.ini_file:
+    path: /etc/gdm3/custom.conf
+    section: daemon
+    option: WaylandEnable
+    value: false
+
+- name: Enable auto login
+  community.general.ini_file:
+    path: /etc/gdm3/custom.conf
+    section: daemon
+    option: AutomaticLoginEnable
+    value: true
+
+- name: Set auto login user
+  community.general.ini_file:
+    path: /etc/gdm3/custom.conf
+    section: daemon
+    option: AutomaticLogin
+    value: kiosk
+
+- name: Create /opt/kiosk if it does not exist
+  ansible.builtin.file:
+    path: /opt/kiosk/
+    state: directory
+    mode: '0755'
+
+- name: Create /home/kiosk/.config if it does not exist
+  ansible.builtin.file:
+    path: /home/kiosk/.config
+    state: directory
+    mode: '0700'
+    owner: kiosk
+    group: kiosk
+
+- name: Create /home/kiosk/.config/autostart if it does not exist
+  ansible.builtin.file:
+    path: /home/kiosk/.config/autostart
+    state: directory
+    mode: '0775'
+    owner: kiosk
+    group: kiosk
+
+- name: Copy cleanup_kiosk.sh script to client
+  ansible.builtin.copy:
+    src: files/cleanup_kiosk.sh
+    dest: /opt/kiosk/cleanup_kiosk.sh
+    mode: '0755'
+
+- name: Copy cgsetting.sh script to client
+  ansible.builtin.copy:
+    src: files/gsettings.sh
+    dest: /opt/kiosk/gsettings.sh
+    mode: '0755'
+
+- name: Copy cgsetting auto start desktop entry client
+  ansible.builtin.copy:
+    src: files/gsettings.desktop
+    dest: /home/kiosk/.config/autostart/gsettings.desktop
+    mode: '0644'
+    owner: kiosk
+    group: kiosk
+
+- name: Create /usr/share/gnome-shell/extensions/no-overview@fthx
+  ansible.builtin.file:
+    path: /usr/share/gnome-shell/extensions/no-overview@fthx
+    state: directory
+    mode: '0755'
+
+- name: Copy no-overview@fthx Gnome extension
+  ansible.builtin.copy:
+    src: files/gnome-extensions/no-overview@fthx/
+    dest: /usr/share/gnome-shell/extensions/no-overview@fthx/
+
+- name: Copy kiosk systemd service to client
+  ansible.builtin.copy:
+    src: files/kiosk.service
+    dest: /lib/systemd/system/kiosk.service
+  register: kioskservice
+
+- name: Force systemd to reread configs
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: kioskservice.changed
+
+- name: Enable kiosk service
+  ansible.builtin.systemd:
+    name: kiosk.service
+    state: started
+    enabled: true

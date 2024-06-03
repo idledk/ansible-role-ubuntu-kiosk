@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+Name=GSettings
+Exec=/opt/kiosk/gsettings.sh
+
